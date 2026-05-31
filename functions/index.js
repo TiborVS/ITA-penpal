@@ -8,7 +8,6 @@
  */
 
 const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
 const logger = require("firebase-functions/logger");
 
 // For cost control, you can set the maximum number of containers that can be
@@ -31,7 +30,8 @@ setGlobalOptions({ maxInstances: 10 });
 //   response.send("Hello from Firebase!");
 // });
 
-const { onCall } = require('firebase-functions/v2/https');
+const { onCall, onRequest } = require('firebase-functions/v2/https');
+const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.firestore();
@@ -57,3 +57,34 @@ exports.createLetter = onCall(async (request) => {
         throw new Error("Error creating letter.");
     }
 });
+
+exports.getAllLetters = onRequest( async (req, res) => {
+    try {
+        if (req.method !== "GET") {
+            res.status(405).send("Only GET requests are allowed.");
+            return;
+        }
+
+        const lettersSnapshot = await db
+            .collection("letters")
+            .orderBy("date", "desc")
+            .get();
+
+        const letters = lettersSnapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+
+        res.status(200).json({ letters });
+    } catch (error) {
+        console.error("Error getting letters: ", error);
+        res.status(500).send("Error getting letters.");
+    }
+});
+
+exports.onLetterCreated = onDocumentCreated(
+    "letters/{letterId}",
+    (event) => {
+        console.log("New letter created: ", event.data);
+    }
+);
