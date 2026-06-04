@@ -36,6 +36,37 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 const db = admin.firestore();
 
+const bcrypt = require('bcrypt');
+
+exports.createUser = onRequest( async (req, res) => {
+    try {
+        if (req.method !== "POST") {
+            res.status(405).send("Only POST requests are allowed.");
+            return;
+        }
+
+        const { username, email, password } = req.body;
+        if (!username || !email || !password) {
+            throw new Error("Missing required fields: username, email, password");
+        }
+
+        encrypted_password = await bcrypt.hash(password, 10);
+
+        await db.collection("users").add({
+            username,
+            email,
+            password: encrypted_password,
+            about: null,
+        });
+
+        return { message: "User created successfully." }
+
+    } catch (err) {
+        console.error("Error creating user: ", err);
+        res.status(500).send("Error creating user.");
+    }
+});
+
 exports.createLetter = onCall(async (request) => {
     try {
         const { content, date, senderId, recipientId } = request.data;
