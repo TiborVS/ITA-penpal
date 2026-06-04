@@ -52,14 +52,14 @@ exports.createUser = onRequest( async (req, res) => {
 
         encrypted_password = await bcrypt.hash(password, 10);
 
-        await db.collection("users").add({
+        const userRef = await db.collection("users").add({
             username,
             email,
             password: encrypted_password,
             about: null,
         });
 
-        return { message: "User created successfully." }
+        res.status(200).json({ message: "User created successfully.", user_id: userRef.id });
 
     } catch (err) {
         console.error("Error creating user: ", err);
