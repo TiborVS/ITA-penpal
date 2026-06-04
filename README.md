@@ -24,3 +24,7 @@ Ideje za nadgradnjo:
 (embedded) namesto samo povezave do datoteke)
 - Poljubno risanje v pismu (npr. lastnoročni podpis, emoji, v glavnem približek izkušnji pisanja z
 lastno roko na papir)
+
+## Razvoj
+
+Ustvari functions/.secret.local datoteko z JWT_SECRET ključem, da stvari delujejo pravilno
