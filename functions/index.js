@@ -35,13 +35,20 @@ const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { FieldValue } = require("firebase-admin/firestore");
 const { defineSecret } = require("firebase-functions/params");
+const { getStorage } = require("firebase-admin/storage");
 const admin = require('firebase-admin');
-admin.initializeApp();
+const serviceAccount = require('../serviceAccountKey.json');
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    storageBucket: "penpal-e86f0.firebasestorage.app",
+});
+
 const db = admin.firestore();
 
 const bcrypt = require('bcrypt');
 const jwt = require("jsonwebtoken");
 const haversine = require("haversine-distance");
+const busboy = require("busboy");
 
 const jwtSecret = defineSecret("JWT_SECRET");
 
@@ -350,7 +357,7 @@ exports.testEnv = onRequest({secrets: [jwtSecret]}, async (req, res) => {
 
 exports.createLetter = onRequest({secrets: [jwtSecret]}, async (req, res) => {
     try {
-        const { content, recipientId } = req.body;
+        const { content, recipientId, attachment } = req.body;
 
         if (!content || !recipientId) {
             throw new Error("Missing required fields: content, recipientId");
@@ -372,10 +379,13 @@ exports.createLetter = onRequest({secrets: [jwtSecret]}, async (req, res) => {
             return res.status(404).send("Recipient user does not exist.");
         }
 
+        let attachmentObj = attachment ? attachment : null;
+
         const letterRef = await db.collection("letters").add({
             content,
             senderId: authenticatedUserId,
             recipientId,
+            attachment,
         });
 
         return res.status(200).json({ message: "Letter created successfully", letterId: letterRef.id });
@@ -423,6 +433,68 @@ exports.onLetterCreated = onDocumentCreated(
         });
     }
 );
+
+exports.getLetter = onRequest({ secrets: [jwtSecret] }, async (req, res) => {
+    try {
+        const letterId = req.query.id;
+
+        if (!letterId) {
+            return res.status(400).send("Missing letter id.");
+        }
+
+        const authHeader = req.headers.authorization;
+        const authenticatedUserId = getAuthenticatedUserId(authHeader, jwtSecret.value());
+
+        if (!authenticatedUserId) {
+            return res.status(401).send("Unauthorized.");
+        }
+
+        const letterDoc = await db
+            .collection("letters")
+            .doc(letterId.toString())
+            .get();
+
+        if (!letterDoc.exists) {
+            return res.status(404).send("Letter not found.");
+        }
+
+        const letter = letterDoc.data();
+
+        if (letter.senderId !== authenticatedUserId && letter.recipientId !== authenticatedUserId) {
+            return res.status(403).send("Forbidden.");
+        }
+
+        let attachmentWithUrl = null;
+
+        if (letter.attachment?.storagePath) {
+            const bucket = getStorage().bucket();
+            const file = bucket.file(letter.attachment.storagePath);
+
+            const [url] = await file.getSignedUrl({
+                action: "read",
+                expires: Date.now() + 1000 * 60 * 60, // 1 hour
+            });
+
+            attachmentWithUrl = {
+                ...letter.attachment,
+                url,
+            };
+        }
+
+        return res.status(200).json({
+            id: letterDoc.id,
+            content: letter.content,
+            senderId: letter.senderId,
+            recipientId: letter.recipientId,
+            delivered: letter.delivered,
+            date: letter.date,
+            attachment: attachmentWithUrl,
+        });
+    } catch (error) {
+        console.error("Error fetching letter:", error);
+        return res.status(500).send("Internal server error.");
+    }
+});
 
 exports.receivedLetters = onRequest({ secrets: [jwtSecret] }, async (req, res) => {
     try {
@@ -633,5 +705,53 @@ exports.myFriends = onRequest({ secrets: [jwtSecret] }, async (req, res) => {
         console.error("Error getting friends:", error);
 
         return res.status(500).json({error: "Error getting friends."});
+    }
+});
+
+exports.uploadLetterAttachment = onRequest(async (req, res) => {
+    try {
+        if (req.method !== "POST") {
+            return res.status(405).send("Method Not Allowed");
+        }
+
+        const bb = busboy({ headers: req.headers });
+
+        let uploadData = null;
+
+        bb.on("file", (name, file, info) => {
+            const { filename, mimeType } = info;
+            const chunks = [];
+
+            file.on("data", (chunk) => {
+                chunks.push(chunk);
+            });
+
+            file.on("end", async () => {
+                const buffer = Buffer.concat(chunks);
+
+                const bucket = getStorage().bucket();
+                const storagePath = `letters/tmp/${Date.now()}_${filename}`;
+                const fileRef = bucket.file(storagePath);
+
+                await fileRef.save(buffer, {
+                    metadata: {
+                        contentType: mimeType,
+                    },
+                });
+
+                uploadData = {
+                    fileName: filename,
+                    contentType: mimeType,
+                    storagePath,
+                };
+
+                res.status(200).json(uploadData);
+            });
+        });
+
+        bb.end(req.rawBody);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Upload failed" });
     }
 });
