@@ -33,6 +33,7 @@ setGlobalOptions({ maxInstances: 10 });
 const { onCall, onRequest } = require('firebase-functions/v2/https');
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
+const { FieldValue } = require("firebase-admin/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require('firebase-admin');
 admin.initializeApp();
@@ -520,4 +521,117 @@ exports.checkForDeliveredLetters = onSchedule(
 exports.testCheckForDeliveredLetters = onRequest(async (req, res) => {
     await checkForDeliveredLettersImplementation();
     res.send("Done, check logs.");
+});
+
+exports.addFriend = onRequest({ secrets: [jwtSecret] }, async (req, res) => {
+    try {
+        const friendId = req.query.friendId;
+
+        if (!friendId) {
+            return res.status(400).json({error: "Missing friendId query parameter"});
+        }
+
+        const authHeader = req.headers.authorization;
+        const authenticatedUserId = getAuthenticatedUserId(authHeader, jwtSecret.value());
+
+        if (!authenticatedUserId) {
+            return res.status(401).json({error: "You must be logged in."});
+        }
+
+        if (friendId === authenticatedUserId) {
+            return res.status(400).json({error: "You cannot add yourself as a friend."});
+        }
+
+        const friendDoc = await db.collection("users").doc(friendId).get();
+
+        if (!friendDoc.exists) {
+            return res.status(404).json({error: "User not found."});
+        }
+
+        await db.collection("users").doc(authenticatedUserId).update({
+            friends: FieldValue.arrayUnion(friendId),
+        });
+
+        return res.status(200).json({message: "Friend added successfully."});
+    } catch (error) {
+        console.error("Error adding friend:", error);
+
+        return res.status(500).json({error: "Error adding friend."});
+    }
+});
+
+exports.removeFriend = onRequest({ secrets: [jwtSecret] }, async (req, res) => {
+    try {
+        const friendId = req.query.friendId;
+
+        if (!friendId) {
+            return res.status(400).json({error: "Missing friendId query parameter"});
+        }
+
+        const authHeader = req.headers.authorization;
+        const authenticatedUserId = getAuthenticatedUserId(authHeader, jwtSecret.value());
+
+        if (!authenticatedUserId) {
+            return res.status(401).json({error: "You must be logged in."});
+        }
+
+        await db.collection("users").doc(authenticatedUserId).update({
+            friends: FieldValue.arrayRemove(friendId),
+        });
+
+        return res.status(200).json({message: "Friend removed successfully."});
+    } catch (error) {
+        console.error("Error removing friend:", error);
+
+        return res.status(500).json({
+            error: "Error removing friend.",
+        });
+    }
+});
+
+exports.myFriends = onRequest({ secrets: [jwtSecret] }, async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        const authenticatedUserId = getAuthenticatedUserId(authHeader, jwtSecret.value());
+
+        if (!authenticatedUserId) {
+            return res.status(401).json({error: "You must be logged in."});
+        }
+
+        const userDoc = await db
+            .collection("users")
+            .doc(authenticatedUserId)
+            .get();
+
+        const userData = userDoc.data();
+        const friendIds = userData.friends || [];
+
+        if (friendIds.length === 0) {
+            return res.status(200).json({friends: [],});
+        }
+
+        const friendDocs = await Promise.all(
+            friendIds.map(friendId =>
+                db.collection("users").doc(friendId).get()
+            )
+        );
+
+        const friends = friendDocs
+            .filter(doc => doc.exists)
+            .map(doc => {
+                const data = doc.data();
+
+                return {
+                    id: doc.id,
+                    username: data.username || null,
+                    about: data.about || null,
+                };
+            });
+
+        return res.status(200).json({friends});
+    } catch (error) {
+        console.error("Error getting friends:", error);
+
+        return res.status(500).json({error: "Error getting friends."});
+    }
 });
