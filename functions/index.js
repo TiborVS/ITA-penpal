@@ -31,6 +31,7 @@ setGlobalOptions({ maxInstances: 10 });
 // });
 
 const { onCall, onRequest } = require('firebase-functions/v2/https');
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } = require("firebase-functions/v2/firestore");
 const { defineSecret } = require("firebase-functions/params");
 const admin = require('firebase-admin');
@@ -39,6 +40,7 @@ const db = admin.firestore();
 
 const bcrypt = require('bcrypt');
 const jwt = require("jsonwebtoken");
+const haversine = require("haversine-distance");
 
 const jwtSecret = defineSecret("JWT_SECRET");
 
@@ -58,6 +60,39 @@ function getAuthenticatedUserId(authHeader, secret) {
     }
 }
 
+function getDaysToDeliverLetter(senderLocation, recipientLocation) {
+    if (senderLocation.latitude == null || senderLocation.longitude == null) {
+        throw new Error("senderLocation must have latitude and longitude properties");
+    }
+    if (recipientLocation.latitude == null || recipientLocation.longitude == null) {
+        throw new Error("recipientLocation must have latitude and longitude properties");
+    }
+
+    const distanceMeters = haversine(senderLocation, recipientLocation);
+    const distanceKm = distanceMeters / 1000.0;
+
+    if (distanceKm <= 150) {
+        return 1;
+    }
+    else if (distanceKm <= 300) {
+        return 2;
+    }
+    else if (distanceKm <= 500) {
+        return 3;
+    }
+    else if (distanceKm <= 800) {
+        return 4;
+    }
+    else if (distanceKm <= 1500) {
+        return 5;
+    }
+    else if (didstanceKm <= 5000) {
+        return 6;
+    }
+    else return 7;
+
+}
+
 exports.createUser = onRequest({secrets: [jwtSecret]}, async (req, res) => {
     try {
         if (req.method !== "POST") {
@@ -65,9 +100,14 @@ exports.createUser = onRequest({secrets: [jwtSecret]}, async (req, res) => {
             return;
         }
 
-        const { username, email, password } = req.body;
+        let { username, email, password, latitude, longitude } = req.body;
         if (!username || !email || !password) {
             throw new Error("Missing required fields: username, email, password");
+        }
+
+        if (latitude == null || longitude == null) {
+            latitude = 46.5535096;
+            longitude = 15.6033537;
         }
 
         encrypted_password = await bcrypt.hash(password, 10);
@@ -77,6 +117,10 @@ exports.createUser = onRequest({secrets: [jwtSecret]}, async (req, res) => {
             email,
             password: encrypted_password,
             about: null,
+            location: {
+                latitude,
+                longitude,
+            },
         });
 
         const token = jwt.sign({"userId": userRef.id}, jwtSecret.value(), {expiresIn: "7d"});
@@ -108,10 +152,10 @@ exports.updateUser = onRequest({secrets: [jwtSecret]}, async (req, res) => {
             return res.status(403).send("You are not allowed to update this user.");
         }
 
-        const { username, about } = req.body;
+        const { username, about, latitude, longitude } = req.body;
 
-        if (!username && !about) {
-            throw new Error("At least one field (username or about) must be provided.");
+        if (!username && !about && (latitude == null || longitude == null)) { // can't use ! because lat/long could be 0.0 which is falsy
+            throw new Error("At least one field (username, about, (latitude and longitude)) must be provided.");
         }
 
         const userRef = db.collection("users").doc(userId);
@@ -129,6 +173,11 @@ exports.updateUser = onRequest({secrets: [jwtSecret]}, async (req, res) => {
 
         if (about) {
             updates.about = about;
+        }
+
+        if (latitude != null && longitude != null) {
+            updates.latitude = latitude;
+            updates.longitude = longitude;
         }
 
         await userRef.update(updates);
@@ -313,13 +362,22 @@ exports.createLetter = onRequest({secrets: [jwtSecret]}, async (req, res) => {
             return res.status(401).send("You must be logged in to create a letter.");
         }
 
+        const recipientDoc = await db
+            .collection("users")
+            .doc(recipientId.toString())
+            .get();
+
+        if (!recipientDoc.exists) {
+            return res.status(404).send("Recipient user does not exist.");
+        }
+
         const letterRef = await db.collection("letters").add({
             content,
             senderId: authenticatedUserId,
             recipientId,
         });
 
-        return res.status(200).json({ message: "Letter created successfully" });
+        return res.status(200).json({ message: "Letter created successfully", letterId: letterRef.id });
     } catch (error) {
         console.error("Error creating letter: ", error);
         throw new Error("Error creating letter.");
@@ -358,6 +416,108 @@ exports.onLetterCreated = onDocumentCreated(
         console.log("New letter created: ", event.data);
         console.log("Adding current date to letter.");
         const letterRef = event.data.ref;
-        await letterRef.update({date: (new Date().toISOString().split('T')[0])});
+        await letterRef.update({
+            date: (new Date().toISOString().split('T')[0]),
+            delivered: false
+        });
     }
 );
+
+exports.receivedLetters = onRequest({ secrets: [jwtSecret] }, async (req, res) => {
+    try {
+        const authHeader = req.headers.authorization;
+        const authenticatedUserId = getAuthenticatedUserId(authHeader, jwtSecret.value());
+
+        if (!authenticatedUserId) {
+            return res.status(401).send("You must be logged in to view received letters.");
+        }
+
+        const snapshot = await db
+            .collection("letters")
+            .where("recipientId", "==", authenticatedUserId)
+            .where("delivered", "==", true)
+            .get();
+
+        const letters = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
+
+        return res.status(200).json({ letters });
+    } catch (error) {
+        console.error("Error getting received letters:", error);
+        return res.status(500).send("Error getting received letters.");
+    }
+});
+
+async function checkForDeliveredLettersImplementation() {
+    try {
+        const lettersSnapshot = await db
+            .collection("letters")
+            .where("delivered", "==", false)
+            .get();
+
+        const today = new Date();
+        const todayUtc = new Date(
+            Date.UTC(
+                today.getUTCFullYear(),
+                today.getUTCMonth(),
+                today.getUTCDate()
+            )
+        );
+
+        for (const letterDoc of lettersSnapshot.docs) {
+            const letter = letterDoc.data();
+
+            try {
+                const { senderId, recipientId, date } = letter;
+
+                const sentDate = new Date(`${date}T00:00:00Z`);
+
+                const elapsedDays = Math.floor(
+                    (todayUtc.getTime() - sentDate.getTime()) /
+                    (1000 * 60 * 60 * 24)
+                );
+
+                const senderDoc = await db.collection("users").doc(senderId).get();
+                const recipientDoc = await db.collection("users").doc(recipientId).get();
+
+                const sender = senderDoc.data();
+                const recipient = recipientDoc.data();
+
+                const senderLocation = sender.location;
+                const recipientLocation = recipient.location;
+
+                const requiredDays = getDaysToDeliverLetter(senderLocation, recipientLocation);
+
+                if (elapsedDays >= requiredDays) {
+                    await letterDoc.ref.update({delivered: true,});
+
+                    console.log("Delivered letter " + letterDoc.id);
+                }
+            } catch (error) {
+                console.error("Error processing letter " +  letterDoc.id + " :", error);
+            }
+        }
+
+        console.log("Finished checking undelivered letters.");
+
+    } catch (error) {
+        console.error("Error checking delivered letters:", error);
+    }
+}
+
+exports.checkForDeliveredLetters = onSchedule(
+    {
+        schedule: "0 7 * * *",
+        timeZone: "Europe/Ljubljana",
+    },
+    async (event) => {
+        await checkForDeliveredLettersImplementation();
+    }
+);
+
+exports.testCheckForDeliveredLetters = onRequest(async (req, res) => {
+    await checkForDeliveredLettersImplementation();
+    res.send("Done, check logs.");
+});
