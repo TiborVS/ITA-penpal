@@ -32,6 +32,16 @@ export class AuthManager {
         return true;
     }
 
+    logout() {
+        this.token = null;
+        this.userId = null;
+        this.username = null;
+        localStorage.removeItem("token");
+        localStorage.removeItem("userId");
+        localStorage.removeItem("username");
+        this.loggedIn = false;
+    }
+
     isLoggedIn() {
         return this.loggedIn;
     }
