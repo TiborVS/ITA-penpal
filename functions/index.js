@@ -133,7 +133,7 @@ exports.createUser = onRequest({secrets: [jwtSecret]}, async (req, res) => {
 
         const token = jwt.sign({"userId": userRef.id}, jwtSecret.value(), {expiresIn: "7d"});
 
-        res.status(200).json({ message: "User created successfully.", userId: userRef.id, token: token });
+        res.status(200).json({ message: "User created successfully.", userId: userRef.id, token: token, username: username });
 
     } catch (err) {
         console.error("Error creating user: ", err);
