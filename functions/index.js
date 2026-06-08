@@ -339,7 +339,7 @@ exports.login = onRequest({ secrets: [jwtSecret] }, async (req, res) => {
 
         const token = jwt.sign({userId: userDoc.id}, jwtSecret.value(), {expiresIn: "7d"});
 
-        return res.status(200).json({token});
+        return res.status(200).json({token, userId: userDoc.id, username: userData.username});
 
     } catch (err) {
         console.error("Error logging in:", err);
@@ -379,14 +379,17 @@ exports.createLetter = onRequest({secrets: [jwtSecret]}, async (req, res) => {
             return res.status(404).send("Recipient user does not exist.");
         }
 
-        let attachmentObj = attachment ? attachment : null;
-
-        const letterRef = await db.collection("letters").add({
+        let letterObj = {
             content,
             senderId: authenticatedUserId,
-            recipientId,
-            attachment,
-        });
+            recipientId
+        };
+
+        if (attachment) {
+            letterObj.attachment = attachment;
+        }
+
+        const letterRef = await db.collection("letters").add(letterObj);
 
         return res.status(200).json({ message: "Letter created successfully", letterId: letterRef.id });
     } catch (error) {

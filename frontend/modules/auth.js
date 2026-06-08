@@ -1,5 +1,8 @@
 export class AuthManager {
 
+    #token = null;
+    #userId = null;
+    #username = null;
     #loggedIn = false;
 
     constructor() {
@@ -7,7 +10,7 @@ export class AuthManager {
         const userId = localStorage.getItem("userId");
         const username = localStorage.getItem("username");
         if (!token || !userId || !username) {
-            console.log("AuthManager: token or userId or username are falsy, user is not logged in.");
+            console.log("AuthManager constructor: token or userId or username are falsy, user is not logged in.");
         }
         else {
             this.token = token;
@@ -19,7 +22,7 @@ export class AuthManager {
 
     login(token, userId, username) {
         if (!token || !userId || !username) {
-            console.log("AuthManager: token or userId or username are falsy, user is not logged in.");
+            console.warn("AuthManager login: token or userId or username are falsy, user is not logged in.");
             return false;
         }
         this.token = token;
@@ -45,4 +48,24 @@ export class AuthManager {
     isLoggedIn() {
         return this.loggedIn;
     }
-}
+
+    getToken() {
+        return this.token;
+    }
+
+    getUserId() {
+        return this.userId;
+    }
+
+    getUsername() {
+        return this.username;
+    }
+
+    getUser() {
+        return {
+            token: this.token,
+            userId: this.userId,
+            username: this.username
+        };
+    }
+} 

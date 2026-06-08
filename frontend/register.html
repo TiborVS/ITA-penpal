@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PenPal</title>
+</head>
+<body>
+    <div id="page-register" hidden></div>
+    <h1>Register</h1>
+    <form>
+        <label for="input-email">Email</label>
+        <input type="text" name="email" id="input-email">
+        <br>
+        <label for="input-username">Username</label>
+        <input type="text" name="username" id="input-username">
+        <br>
+        <label for="input-password">Password</label>
+        <input type="text" name="password" id="input-password">
+        <br>
+        <label for="input-latitude">Latitude</label>
+        <input type="text" name="latitude" id="input-latitude">
+        <br>
+        <label for="input-longitude">Longitude</label>
+        <input type="text" name="longitude" id="input-longitude">
+        <br>
+        <p>If you don't enter both latitude and longitude, a default location in Maribor will be set.</p>
+        <button id="input-submit" type="submit">Register</button>
+        <p id="form-info"></p>
+    </form>
+    <script type="module" src="main.js"></script>
+</body>
+</html> 
