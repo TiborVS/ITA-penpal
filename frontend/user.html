@@ -4,10 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PenPal</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <nav>
+        <a href="/inbox.html">Inbox</a>
+        <a href="/write.html">Write letter</a>
+        <a href="/friends.html">Friends</a>
+        <a href="/user.html">Profile</a>
+        <a href="/users.html">Find friends</a>
+        <button id="button-logout">Log out</button>
+    </nav>
     <div id="page-user" hidden></div>
-    <h1>User</h1>
+    <h1>Profile</h1>
+    <div id="user-data">
+        <h2 id="user-username"></h2>
+        <p id="user-about"></p>
+        <p>
+            <span>Latitude: </span><span id="user-latitude"></span>
+            <span>, </span>
+            <span>Longitude: </span><span id="user-longitude"></span>
+        </p>
+        <div id="friend-status"></div>
+        <form id="user-edit-form" hidden>
+            <label for="username">Username</label>
+            <input type="text" name="username" id="input-username">
+            <br>
+            <label for="latitude">Latitude</label>
+            <input type="text" name="latitude" id="input-latitude">
+            <br>
+            <label for="longitude">Longitude</label>
+            <input type="text" name="longitude" id="input-longitude">
+            <br>
+            <label for="about">About</label>
+            <textarea name="about" id="input-about"></textarea>
+            <br>
+            <button id="input-submit" type="submit">Update</button>
+            <p id="form-info"></p>
+        </form>
+    </div>
     <script type="module" src="main.js"></script>
 </body>
 </html> 

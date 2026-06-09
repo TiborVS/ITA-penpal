@@ -117,6 +117,10 @@ exports.createUser = onRequest({secrets: [jwtSecret]}, async (req, res) => {
             latitude = 46.5535096;
             longitude = 15.6033537;
         }
+        else if (isNaN(parseFloat(latitude)) || isNaN(parseFloat(longitude))) {
+            latitude = 46.5535096;
+            longitude = 15.6033537;
+        }
 
         encrypted_password = await bcrypt.hash(password, 10);
 
@@ -126,8 +130,8 @@ exports.createUser = onRequest({secrets: [jwtSecret]}, async (req, res) => {
             password: encrypted_password,
             about: null,
             location: {
-                latitude,
-                longitude,
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude),
             },
         });
 
@@ -249,7 +253,7 @@ exports.getAllUsers = onRequest(async (req, res) => {
 
         const users = snapshot.docs.map(doc => {
             const { username, about } = doc.data();
-            return { username, about };
+            return { id: doc.id, username, about };
         });
 
         return res.status(200).json(users);
@@ -289,12 +293,15 @@ exports.getUser = onRequest({secrets: [jwtSecret]}, async (req, res) => {
                 username: userData.username,
                 email: userData.email,
                 about: userData.about,
+                friends: userData.friends,
+                location: userData.location
             });
         }
 
         return res.status(200).json({
             username: userData.username,
             about: userData.about,
+            location: userData.location
         });
 
     } catch (err) {
@@ -714,7 +721,7 @@ exports.myFriends = onRequest({ secrets: [jwtSecret] }, async (req, res) => {
 exports.uploadLetterAttachment = onRequest(async (req, res) => {
     try {
         if (req.method !== "POST") {
-            return res.status(405).send("Method Not Allowed");
+            return res.status(405).send("Only POST requests are allowed");
         }
 
         const bb = busboy({ headers: req.headers });

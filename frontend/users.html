@@ -4,10 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PenPal</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <nav>
+        <a href="/inbox.html">Inbox</a>
+        <a href="/write.html">Write letter</a>
+        <a href="/friends.html">Friends</a>
+        <a href="/user.html">Profile</a>
+        <a href="/users.html">Find friends</a>
+        <button id="button-logout">Log out</button>
+    </nav>
     <div id="page-users" hidden></div>
     <h1>Users</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>User</th>
+                <th>About</th>
+            </tr>
+        </thead>
+        <tbody id="users-table-body"></tbody>
+    </table>
     <script type="module" src="main.js"></script>
 </body>
 </html> 

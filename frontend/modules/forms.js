@@ -6,11 +6,11 @@ export class Forms {
         "register": async (event) => {
             event.preventDefault();
             const response = await API.createUser(
-                this.#getTextBoxValue("username"),
-                this.#getTextBoxValue("email"),
-                this.#getTextBoxValue("password"),
-                this.#getTextBoxValue("latitude"),
-                this.#getTextBoxValue("longitude")
+                this.#getInputValue("username"),
+                this.#getInputValue("email"),
+                this.#getInputValue("password"),
+                this.#getInputValue("latitude"),
+                this.#getInputValue("longitude")
             )
             console.debug(response);
             if (response.error != null) {
@@ -30,8 +30,8 @@ export class Forms {
         "login": async (event) => {
             event.preventDefault();
             const response = await API.login(
-                this.#getTextBoxValue("email"),
-                this.#getTextBoxValue("password")                
+                this.#getInputValue("email"),
+                this.#getInputValue("password")                
             );
             console.debug(response);
             if (response.error != null) {
@@ -47,10 +47,57 @@ export class Forms {
                     this.#setFormInfo("Unknown error logging in.");
                 }
             }
+        },
+        "update-user": async (event) => {
+            event.preventDefault();
+            const auth = new AuthManager();
+            let updateValues = {};
+            const username = this.#getInputValue("username");
+            const about = this.#getInputValue("about");
+            const latitude = this.#getInputValue("latitude");
+            const longitude = this.#getInputValue("longitude");
+            if (username !== "") updateValues.username = username;
+            if (about !== "") updateValues.about = about;
+            if (latitude !== "" && longitude !== "") {
+                updateValues.latitude = latitude;
+                updateValues.longitude = longitude;
+            }
+            const result = await API.updateUser(auth.getUserId(), updateValues, auth.getToken());
+            if (result === true) {
+                document.getElementById("user-edit-form").reset();
+                window.location.reload();
+            }
+            else {
+                window.alert("Error updating user, try again later");
+            }
+        },
+        "write-letter": async (event) => {
+            event.preventDefault();
+            const auth = new AuthManager();
+
+            let formData = new FormData();
+            const fileList = document.getElementById("input-file").files;
+            if (fileList.length > 0) {
+                const attachmentFile = fileList[0];
+                formData.append("file", attachmentFile);
+            }
+            const result = await API.createLetter(
+                this.#getInputValue("content"),
+                this.#getInputValue("recipient"),
+                auth.getToken(),
+                formData.has("file") ? formData : null
+            );
+            if (result === true) {
+                window.alert("Letter sent!");
+                window.location.replace("/inbox.html");
+            }
+            else {
+                window.alert("Error sending letter, try again later.");
+            }
         }
     }
 
-    static #getTextBoxValue(fieldName) {
+    static #getInputValue(fieldName) {
         return document.getElementById("input-" + fieldName).value;
     }
 

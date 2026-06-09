@@ -1,0 +1,67 @@
+* {
+    font-family: sans-serif;
+}
+
+body, input, button, textarea, select {
+    background-color: #d6c1b1;
+}
+
+select option {
+    background: #d6c1b1;
+}
+
+nav {
+    width: fit-content;
+    margin: 3em auto;
+    
+}
+
+h1, h2, h3 {
+    text-align: center;
+}
+
+ul#list-letters {
+    width: fit-content;
+    margin: auto;
+}
+
+form {
+    width: fit-content;
+    margin: auto;
+}
+
+table {
+    width: fit-content;
+    margin: auto;
+}
+
+div#user-data {
+    width: fit-content;
+    margin: auto;
+    max-width: 600px;
+    text-align: center;
+}
+
+form#user-edit-form {
+    margin: 2em 0;
+}
+
+div#index {
+    width: fit-content;
+    margin: auto;
+}
+
+a {
+    text-decoration: none;
+    color: #000000
+}
+
+a:hover, button:hover {
+    background-color: #baa391;
+}
+
+div#letter-data {
+    max-width: 600px;
+    width: fit-content;
+    margin: auto;
+}

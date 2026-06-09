@@ -4,10 +4,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PenPal</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <nav>
+        <a href="/inbox.html">Inbox</a>
+        <a href="/write.html">Write letter</a>
+        <a href="/friends.html">Friends</a>
+        <a href="/user.html">Profile</a>
+        <a href="/users.html">Find friends</a>
+        <button id="button-logout">Log out</button>
+    </nav>
     <div id="page-write" hidden></div>
     <h1>Write letter</h1>
+    <form id="write-letter-form">
+        <h3>Send to:</h3>
+        <select name="recipient" id="input-recipient">
+            <option value="">Select a recipient</option>
+        </select>
+        <hr>
+        <textarea name="content" id="input-content" placeholder="Write letter here ..."></textarea>
+        <br>
+        <label for="input-file">Attach file (optional)</label>
+        <input type="file" name="file" id="input-file">
+        <br>
+        <button type="submit" id="input-submit">Send</button>
+    </form>
     <script type="module" src="main.js"></script>
 </body>
 </html> 
